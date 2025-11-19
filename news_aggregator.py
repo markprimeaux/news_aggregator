@@ -142,6 +142,13 @@ def clean_html(text: str) -> str:
     return re.sub(clean, '', text)
 
 
+def strip_ansi_codes(text: str) -> str:
+    """Remove ANSI escape codes from text."""
+    import re
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', text)
+
+
 def format_articles_output(articles: List[Dict], show_summary: bool = False) -> str:
     """
     Format articles as a string for display.
@@ -457,7 +464,7 @@ def get_available_categories() -> List[str]:
 
 def fetch_weather_ascii(location: str) -> List[str]:
     """
-    Fetch 7-day ASCII weather forecast for a location using wttr.in.
+    Fetch compact ASCII weather forecast for a location using wttr.in.
 
     Args:
         location: Location string (e.g., "Lynnfield,MA" or "Ossipee,NH")
@@ -469,9 +476,9 @@ def fetch_weather_ascii(location: str) -> List[str]:
         # Format location for URL (replace spaces with +)
         location_formatted = location.replace(" ", "+").replace(",", ",")
 
-        # Use wttr.in with narrow format for compact display
-        # Options: 0 = current weather only, F = Fahrenheit, n = narrow (suitable for side display)
-        url = f"http://wttr.in/{location_formatted}?format=v2&F"
+        # Use wttr.in with compact format optimized for small screens
+        # Options: 1 = current weather + today forecast (narrow), F = Fahrenheit
+        url = f"http://wttr.in/{location_formatted}?1F"
 
         headers = {
             'User-Agent': 'curl/7.68.0'  # wttr.in works best with curl user agent
@@ -482,6 +489,8 @@ def fetch_weather_ascii(location: str) -> List[str]:
 
         # Split into lines and return
         lines = response.text.split('\n')
+        # Filter out empty lines to save space
+        lines = [line for line in lines if line.strip()]
         return lines
     except Exception as e:
         # Return error message as ASCII art
@@ -527,8 +536,8 @@ def interactive_main_menu(stdscr, weather_data: Optional[Dict[str, List[str]]] =
         stdscr.clear()
         height, width = stdscr.getmaxyx()
 
-        # Split screen in half
-        mid_point = width // 2
+        # Split screen: left 1/3 for menu, right 2/3 for weather
+        mid_point = width // 3
 
         # Header (full width)
         header = "📰 GLOBAL NEWS AGGREGATOR"
@@ -582,6 +591,14 @@ def interactive_main_menu(stdscr, weather_data: Optional[Dict[str, List[str]]] =
             weather_start_row = 5
             current_y = weather_start_row
 
+            # Calculate available vertical space for weather
+            available_height = height - weather_start_row - 2  # Reserve space for footer
+            num_locations = len(weather_data)
+
+            # Calculate max lines per location (with spacing between)
+            # Account for: 1 line header + weather lines + 1 line spacing per location
+            max_lines_per_location = max(3, (available_height - num_locations * 2) // num_locations)
+
             for location, weather_lines in weather_data.items():
                 # Add location header
                 if current_y < height - 2:
@@ -593,17 +610,20 @@ def interactive_main_menu(stdscr, weather_data: Optional[Dict[str, List[str]]] =
                     except:
                         pass
 
-                # Display weather lines
+                # Display weather lines (truncated to fit)
+                lines_displayed = 0
                 for line in weather_lines:
-                    if current_y >= height - 2:
+                    if current_y >= height - 2 or lines_displayed >= max_lines_per_location:
                         break
-                    # Truncate to fit right half
+                    # Strip ANSI codes and truncate to fit right half
+                    clean_line = strip_ansi_codes(line)
                     max_line_width = width - mid_point - 3
-                    display_line = line[:max_line_width] if len(line) > max_line_width else line
+                    display_line = clean_line[:max_line_width] if len(clean_line) > max_line_width else clean_line
                     try:
                         stdscr.addstr(current_y, mid_point + 2, display_line,
                                     curses.color_pair(5))
                         current_y += 1
+                        lines_displayed += 1
                     except:
                         pass
 
@@ -893,8 +913,8 @@ def main():
             # Fetch weather for the three locations
             locations = {
                 "Lynnfield, MA": "Lynnfield,MA",
-                "Ossipee, NH": "Ossipee,NH",
-                "Meridian, MS": "Meridian,MS"
+                "Center Ossipee, NH": "Center Ossipee,NH",
+                # "Meridian, MS": "Meridian,MS"  # Commented out - can be re-enabled if needed
             }
 
             weather_data = {}
