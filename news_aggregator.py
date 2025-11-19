@@ -455,12 +455,53 @@ def get_available_categories() -> List[str]:
     return sorted(categories)
 
 
-def interactive_main_menu(stdscr) -> Optional[str]:
+def fetch_weather_ascii(location: str) -> List[str]:
+    """
+    Fetch 7-day ASCII weather forecast for a location using wttr.in.
+
+    Args:
+        location: Location string (e.g., "Lynnfield,MA" or "Ossipee,NH")
+
+    Returns:
+        List of strings representing the ASCII weather display
+    """
+    try:
+        # Format location for URL (replace spaces with +)
+        location_formatted = location.replace(" ", "+").replace(",", ",")
+
+        # Use wttr.in with narrow format for compact display
+        # Options: 0 = current weather only, F = Fahrenheit, n = narrow (suitable for side display)
+        url = f"http://wttr.in/{location_formatted}?format=v2&F"
+
+        headers = {
+            'User-Agent': 'curl/7.68.0'  # wttr.in works best with curl user agent
+        }
+
+        response = requests.get(url, headers=headers, timeout=5)
+        response.raise_for_status()
+
+        # Split into lines and return
+        lines = response.text.split('\n')
+        return lines
+    except Exception as e:
+        # Return error message as ASCII art
+        return [
+            f"Weather for {location}",
+            "=" * 30,
+            "Unable to fetch weather",
+            f"Error: {str(e)[:40]}",
+            "=" * 30
+        ]
+
+
+def interactive_main_menu(stdscr, weather_data: Optional[Dict[str, List[str]]] = None) -> Optional[str]:
     """
     Display the main menu with options to browse by category, individual sources, or exit.
+    Weather information is displayed on the right half of the screen.
 
     Args:
         stdscr: Curses window object
+        weather_data: Optional dict mapping location names to weather ASCII lines
 
     Returns:
         Menu choice: "categories", "sources", or None for exit
@@ -480,12 +521,16 @@ def interactive_main_menu(stdscr) -> Optional[str]:
     curses.init_pair(2, curses.COLOR_CYAN, curses.COLOR_BLACK)   # Title
     curses.init_pair(3, curses.COLOR_GREEN, curses.COLOR_BLACK)  # Menu items
     curses.init_pair(4, curses.COLOR_RED, curses.COLOR_BLACK)    # Exit option
+    curses.init_pair(5, curses.COLOR_YELLOW, curses.COLOR_BLACK) # Weather
 
     while True:
         stdscr.clear()
         height, width = stdscr.getmaxyx()
 
-        # Header
+        # Split screen in half
+        mid_point = width // 2
+
+        # Header (full width)
         header = "📰 GLOBAL NEWS AGGREGATOR"
         stdscr.addstr(0, (width - len(header)) // 2, header, curses.color_pair(2) | curses.A_BOLD)
         stdscr.addstr(1, 0, "=" * (width-1))
@@ -494,8 +539,9 @@ def interactive_main_menu(stdscr) -> Optional[str]:
         stdscr.addstr(2, (width - len(instructions)) // 2, instructions)
         stdscr.addstr(3, 0, "=" * (width-1))
 
-        # Display menu options
+        # LEFT HALF: Display menu options
         start_row = 6
+        left_center = mid_point // 2
         for idx, (label, value, description) in enumerate(menu_items):
             y_pos = start_row + (idx * 3)
 
@@ -509,16 +555,60 @@ def interactive_main_menu(stdscr) -> Optional[str]:
             # Choose color based on item
             item_color = curses.color_pair(4) if value == "exit" else curses.color_pair(3)
 
+            # Center text in left half
+            x_pos = max(0, left_center - len(display_text) // 2)
+
             if idx == current_row:
-                stdscr.addstr(y_pos, (width - len(display_text)) // 2, display_text,
+                stdscr.addstr(y_pos, x_pos, display_text,
                             curses.color_pair(1) | curses.A_BOLD)
             else:
-                stdscr.addstr(y_pos, (width - len(display_text)) // 2, display_text, item_color)
+                stdscr.addstr(y_pos, x_pos, display_text, item_color)
 
-            # Show description
+            # Show description (only for current selection)
             if idx == current_row:
-                stdscr.addstr(y_pos + 1, (width - len(description)) // 2, description,
+                desc_x = max(0, left_center - len(description) // 2)
+                stdscr.addstr(y_pos + 1, desc_x, description[:mid_point-2],
                             curses.color_pair(2))
+
+        # Draw vertical separator
+        for y in range(4, height - 1):
+            try:
+                stdscr.addstr(y, mid_point, "│", curses.color_pair(2))
+            except:
+                pass
+
+        # RIGHT HALF: Display weather information
+        if weather_data:
+            weather_start_row = 5
+            current_y = weather_start_row
+
+            for location, weather_lines in weather_data.items():
+                # Add location header
+                if current_y < height - 2:
+                    location_header = f" {location} "
+                    try:
+                        stdscr.addstr(current_y, mid_point + 2, location_header,
+                                    curses.color_pair(2) | curses.A_BOLD)
+                        current_y += 1
+                    except:
+                        pass
+
+                # Display weather lines
+                for line in weather_lines:
+                    if current_y >= height - 2:
+                        break
+                    # Truncate to fit right half
+                    max_line_width = width - mid_point - 3
+                    display_line = line[:max_line_width] if len(line) > max_line_width else line
+                    try:
+                        stdscr.addstr(current_y, mid_point + 2, display_line,
+                                    curses.color_pair(5))
+                        current_y += 1
+                    except:
+                        pass
+
+                # Add spacing between locations
+                current_y += 1
 
         # Footer
         footer = f"Option {current_row + 1}/{len(menu_items)}"
@@ -798,10 +888,27 @@ def main():
         try:
             # Show main menu
             print("\n📰 GLOBAL NEWS AGGREGATOR\n")
-            print("Press any key to open main menu...")
+            print("Fetching weather information...")
+
+            # Fetch weather for the three locations
+            locations = {
+                "Lynnfield, MA": "Lynnfield,MA",
+                "Ossipee, NH": "Ossipee,NH",
+                "Meridian, MS": "Meridian,MS"
+            }
+
+            weather_data = {}
+            for display_name, location_code in locations.items():
+                print(f"  - {display_name}...", end=" ")
+                weather_lines = fetch_weather_ascii(location_code)
+                weather_data[display_name] = weather_lines
+                print("✓")
+
+            print("\nPress any key to open main menu...")
             input()
 
-            menu_choice = curses.wrapper(interactive_main_menu)
+            # Pass weather data to the menu
+            menu_choice = curses.wrapper(interactive_main_menu, weather_data)
 
             if menu_choice is None:
                 # User chose to exit
