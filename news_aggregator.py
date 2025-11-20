@@ -276,10 +276,10 @@ def interactive_article_selector(stdscr, articles: List[Dict]) -> Optional[int]:
     current_row = 0
     top_row = 0  # For scrolling
 
-    # Color setup
-    curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)  # Highlight
-    curses.init_pair(2, curses.COLOR_CYAN, curses.COLOR_BLACK)   # Title
-    curses.init_pair(3, curses.COLOR_YELLOW, curses.COLOR_BLACK) # Source
+    # Color setup - softer colors for better readability
+    curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_CYAN)   # Highlight (softer than white)
+    curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLACK)  # Title (white instead of bright cyan)
+    curses.init_pair(3, curses.COLOR_BLUE, curses.COLOR_BLACK)   # Source (blue instead of yellow)
 
     while True:
         stdscr.clear()
@@ -373,43 +373,39 @@ def display_article_reader(article: Dict):
         print("❌ Could not fetch article content.")
         return
 
-    # Format the article with beautiful typography
+    # Format the article with comfortable typography for extended reading
     output = []
     width = 80
 
-    # Top border with decorative elements
+    # Top border - cleaner design
     output.append("")
-    output.append("╔" + "═" * (width - 2) + "╗")
+    output.append("")
+    output.append("=" * width)
 
-    # Title - wrapped and centered
+    # Title - wrapped with better spacing
     title_lines = textwrap.wrap(article['title'], width=width - 8)
+    output.append("")
     for title_line in title_lines:
-        output.append("║ " + title_line.center(width - 4) + " ║")
-
-    output.append("╚" + "═" * (width - 2) + "╝")
+        output.append("  " + title_line)
+    output.append("")
+    output.append("=" * width)
     output.append("")
 
-    # Metadata section with nice formatting
-    output.append("┌" + "─" * (width - 2) + "┐")
-    output.append("│ " + "📰 SOURCE".ljust(width - 4) + " │")
-    source_wrapped = textwrap.wrap(f"   {article['source']}", width=width - 4)
-    for line in source_wrapped:
-        output.append("│ " + line.ljust(width - 4) + " │")
-    output.append("│" + " " * (width - 2) + "│")
-    output.append("│ " + "📅 PUBLISHED".ljust(width - 4) + " │")
-    output.append("│ " + f"   {article['published']}".ljust(width - 4) + " │")
-    output.append("│" + " " * (width - 2) + "│")
-    output.append("│ " + "🔗 LINK".ljust(width - 4) + " │")
-    link_wrapped = textwrap.wrap(f"   {article['link']}", width=width - 4)
+    # Metadata section with cleaner, less cluttered formatting
+    output.append("SOURCE:    " + article['source'])
+    output.append("PUBLISHED: " + article['published'])
+    output.append("")
+    output.append("LINK:")
+    link_wrapped = textwrap.wrap(article['link'], width=width - 4)
     for line in link_wrapped:
-        output.append("│ " + line.ljust(width - 4) + " │")
-    output.append("└" + "─" * (width - 2) + "┘")
+        output.append("  " + line)
     output.append("")
     output.append("")
 
-    # Article body with nice spacing
+    # Article body with improved spacing for comfortable reading
     output.append("─" * width)
     output.append("")
+    output.append("")  # Extra blank line before content
 
     # Process content with paragraph detection
     paragraphs = content.split('\n\n')
@@ -421,28 +417,30 @@ def display_article_reader(article: Dict):
 
         # Check if it looks like a heading (short, no punctuation at end)
         if len(para) < 80 and not para.endswith(('.', '!', '?', '"', "'")):
-            # Format as heading
+            # Format as heading with more spacing
             output.append("")
             output.append("▶ " + para.upper())
             output.append("")
         else:
-            # Format as paragraph with proper indentation
-            # First line indented, justified text
-            lines = textwrap.wrap(para, width=width - 4)
+            # Format as paragraph with comfortable line spacing
+            # Wrap at 75 chars instead of 76 for better readability
+            lines = textwrap.wrap(para, width=width - 6)
             if lines:
-                output.append("    " + lines[0])  # First line with indent
-                for line in lines[1:]:
-                    output.append("    " + line)
+                # Indent all lines consistently for easier reading
+                for line in lines:
+                    output.append("   " + line)
                 output.append("")  # Blank line after paragraph
+                output.append("")  # Extra spacing between paragraphs
 
-    # Footer
+    # Footer - clean and simple
     output.append("")
-    output.append("─" * width)
     output.append("")
-    output.append("┌" + "─" * (width - 2) + "┐")
-    output.append("│" + "END OF ARTICLE".center(width - 2) + "│")
-    output.append("│" + "Press 'q' to return to article list".center(width - 2) + "│")
-    output.append("└" + "─" * (width - 2) + "┘")
+    output.append("=" * width)
+    output.append("")
+    output.append("END OF ARTICLE".center(width))
+    output.append("Press 'q' to return to article list".center(width))
+    output.append("")
+    output.append("=" * width)
     output.append("")
 
     formatted_content = "\n".join(output)
@@ -525,12 +523,12 @@ def interactive_main_menu(stdscr, weather_data: Optional[Dict[str, List[str]]] =
         ("Exit", "exit", "Quit the application")
     ]
 
-    # Color setup
-    curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)  # Highlight
-    curses.init_pair(2, curses.COLOR_CYAN, curses.COLOR_BLACK)   # Title
-    curses.init_pair(3, curses.COLOR_GREEN, curses.COLOR_BLACK)  # Menu items
-    curses.init_pair(4, curses.COLOR_RED, curses.COLOR_BLACK)    # Exit option
-    curses.init_pair(5, curses.COLOR_YELLOW, curses.COLOR_BLACK) # Weather
+    # Color setup - softer colors for better readability
+    curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_CYAN)   # Highlight (softer cyan background)
+    curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLACK)  # Title (white instead of cyan)
+    curses.init_pair(3, curses.COLOR_CYAN, curses.COLOR_BLACK)   # Menu items (soft cyan)
+    curses.init_pair(4, curses.COLOR_RED, curses.COLOR_BLACK)    # Exit option (keep red for warning)
+    curses.init_pair(5, curses.COLOR_BLUE, curses.COLOR_BLACK)   # Weather (blue instead of yellow)
 
     while True:
         stdscr.clear()
@@ -676,10 +674,10 @@ def interactive_category_selector(stdscr, categories: List[str]) -> Optional[str
 
     menu_items = categories
 
-    # Color setup
-    curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)  # Highlight
-    curses.init_pair(2, curses.COLOR_CYAN, curses.COLOR_BLACK)   # Title
-    curses.init_pair(3, curses.COLOR_GREEN, curses.COLOR_BLACK)  # Category
+    # Color setup - softer colors for better readability
+    curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_CYAN)   # Highlight (softer cyan background)
+    curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLACK)  # Title (white instead of cyan)
+    curses.init_pair(3, curses.COLOR_CYAN, curses.COLOR_BLACK)   # Category (soft cyan)
 
     while True:
         stdscr.clear()
@@ -765,12 +763,12 @@ def interactive_source_selector(stdscr) -> Optional[List[str]]:
     # Get all sources sorted by name
     all_sources = sorted(NEWS_SOURCES.keys())
 
-    # Color setup
-    curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)  # Highlight
-    curses.init_pair(2, curses.COLOR_CYAN, curses.COLOR_BLACK)   # Title
-    curses.init_pair(3, curses.COLOR_GREEN, curses.COLOR_BLACK)  # Source
-    curses.init_pair(4, curses.COLOR_YELLOW, curses.COLOR_BLACK) # Selected
-    curses.init_pair(5, curses.COLOR_MAGENTA, curses.COLOR_BLACK) # Category tag
+    # Color setup - softer colors for better readability
+    curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_CYAN)   # Highlight (softer cyan background)
+    curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLACK)  # Title (white instead of cyan)
+    curses.init_pair(3, curses.COLOR_CYAN, curses.COLOR_BLACK)   # Source (soft cyan)
+    curses.init_pair(4, curses.COLOR_GREEN, curses.COLOR_BLACK)  # Selected (green instead of yellow)
+    curses.init_pair(5, curses.COLOR_BLUE, curses.COLOR_BLACK)   # Category tag (blue instead of magenta)
 
     while True:
         stdscr.clear()
