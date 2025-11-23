@@ -101,7 +101,7 @@ NEWS_SOURCES = {
 }
 
 
-def fetch_articles(feed_url: str, source_name: str, category: str, max_articles: int = 5) -> List[Dict]:
+def fetch_articles(feed_url: str, source_name: str, category: str, max_articles: int = 5, timeout: int = 10) -> List[Dict]:
     """
     Fetch articles from an RSS feed.
 
@@ -110,12 +110,19 @@ def fetch_articles(feed_url: str, source_name: str, category: str, max_articles:
         source_name: Name of the news source
         category: Category of the news source
         max_articles: Maximum number of articles to fetch
+        timeout: Request timeout in seconds
 
     Returns:
         List of article dictionaries
     """
     try:
-        feed = feedparser.parse(feed_url)
+        # Use requests with timeout to fetch the feed, then parse it
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        response = requests.get(feed_url, headers=headers, timeout=timeout)
+        response.raise_for_status()
+        feed = feedparser.parse(response.content)
         articles = []
 
         for entry in feed.entries[:max_articles]:
@@ -353,6 +360,15 @@ def interactive_article_selector(stdscr, articles: List[Dict]) -> Optional[int]:
         elif key in [ord('u')]:
             # Ctrl+u - half page up
             current_row = max(current_row - visible_rows // 2, 0)
+        elif key in [ord('z')]:
+            # z commands: zt (current line to top), zz (current line to center)
+            next_key = stdscr.getch()
+            if next_key == ord('t'):
+                # zt - scroll so current line is at top
+                top_row = current_row
+            elif next_key == ord('z'):
+                # zz - scroll so current line is centered
+                top_row = max(0, current_row - visible_rows // 2)
         elif key in [10, 13, curses.KEY_ENTER]:  # Enter key
             return current_row
 
